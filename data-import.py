@@ -4,6 +4,12 @@ import pandas as pd
 import os
 
 from dataclasses import dataclass
+from simplekml import Kml
+
+def scf(v):
+    return 1.194 * v - 0.1733
+def make_color(b):
+    return "ff0000ff" # TODO
 
 lat_col = "Latitude (°)"
 lon_col = "Longitude (°)"
@@ -51,8 +57,8 @@ def extract_specific_files(zip_file_path, filenames_to_extract):
             start_row = data.iloc[i]
             end_row = data.iloc[i+1]
             yield Segment(
-                start=(start_row[lat_col], start_row[lon_col]),
-                end=(end_row[lat_col], end_row[lon_col]),
+                start=(start_row[lon_col], start_row[lat_col]),
+                end=(end_row[lon_col], end_row[lat_col]),
                 vel=start_row[vel_col],
                 acc=acc_data[(start_row[time_col] <= acc_data[time_col]) & (acc_data[time_col] < end_row[time_col])][acc_col],
             )
@@ -76,7 +82,11 @@ def main():
     merged_data = extract_specific_files(args.zip_file, args.filenames)
     
     # Print or return the DataFrame
-    print(list(merged_data))  # Optionally return or process this DataFrame further
+    kml = Kml()
+    for segment in merged_data:
+        lin = kml.newlinestring(coords=[segment.start, segment.end])
+        lin.style.linestyle.color = make_color(segment.acc.abs().mean() * scf(segment.vel))
+    kml.save(args.zip_file + ".kml")
 
 if __name__ == '__main__':
     main()
