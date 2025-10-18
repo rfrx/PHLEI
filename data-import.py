@@ -1,15 +1,29 @@
+#!/usr/bin/env python3
+
 import argparse
+import colorsys
 import zipfile
 import pandas as pd
 import os
-
 from dataclasses import dataclass
+from math import inf
 from simplekml import Kml
 
 def scf(v):
     return 1.194 * v - 0.1733
+
 def make_color(b):
-    return "ff0000ff" # TODO
+    GOOD_OBSERVED = 10
+    MAX_OBSERVED = 278
+    green_h = 130
+    red_h = 0
+    ratio = min(1,max(0, b/MAX_OBSERVED))
+    h = green_h + ratio * (red_h - green_h)
+    r, g, b = colorsys.hsv_to_rgb(h / 360, 1, 0.7)
+    r = int(r * 256)
+    g = int(g * 256)
+    b = int(b * 256)
+    return f"{r:02x}{g:02x}{g:02x}ff"
 
 lat_col = "Latitude (°)"
 lon_col = "Longitude (°)"
@@ -80,13 +94,20 @@ def main():
     args = parser.parse_args()
 
     merged_data = extract_specific_files(args.zip_file, args.filenames)
-    
+
     # Print or return the DataFrame
     kml = Kml()
+    min_bri = inf
+    max_bri = -inf
     for segment in merged_data:
         lin = kml.newlinestring(coords=[segment.start, segment.end])
-        lin.style.linestyle.color = make_color(segment.acc.abs().mean() * scf(segment.vel))
+        bri = segment.acc.abs().mean() * scf(segment.vel)
+        min_bri = min(min_bri, bri)
+        max_bri = max(max_bri, bri)
+        lin.style.linestyle.color = make_color(bri)
+        lin.style.linestyle.width = 10
     kml.save(args.zip_file + ".kml")
+    print(f"{min_bri=} {max_bri=}")
 
 if __name__ == '__main__':
     main()
