@@ -6,24 +6,29 @@ import zipfile
 import pandas as pd
 import os
 from dataclasses import dataclass
-from math import inf
+from math import exp, inf
 from simplekml import Kml
 
 def scf(v):
     return 1.194 * v - 0.1733
 
+
+
+def sigmoid(x, l = 1, k = 8, a = 0.5):
+  return l / (1 + exp(-k * (x - a)))
+
 def make_color(b):
-    GOOD_OBSERVED = 10
-    MAX_OBSERVED = 278
+    GOOD_OBSERVED = 0
+    MAX_OBSERVED = 180
     green_h = 130
     red_h = 0
     ratio = min(1,max(0, b/MAX_OBSERVED))
     h = green_h + ratio * (red_h - green_h)
-    r, g, b = colorsys.hsv_to_rgb(h / 360, 1, 0.7)
+    r, g, b = colorsys.hsv_to_rgb(sigmoid(h / 360), 1, 0.7)
     r = int(r * 256)
     g = int(g * 256)
     b = int(b * 256)
-    return f"{r:02x}{g:02x}{g:02x}ff"
+    return f"ff{b:02x}{g:02x}{r:02x}"
 
 lat_col = "Latitude (°)"
 lon_col = "Longitude (°)"
@@ -97,15 +102,19 @@ def main():
 
     # Print or return the DataFrame
     kml = Kml()
+    # fol = kml.newfolder(name=args.zip_file)
     min_bri = inf
     max_bri = -inf
     for segment in merged_data:
+        if segment.start == segment.end:
+            print("skipping segment with equal start and end")
+            continue
         lin = kml.newlinestring(coords=[segment.start, segment.end])
         bri = segment.acc.abs().mean() * scf(segment.vel)
         min_bri = min(min_bri, bri)
         max_bri = max(max_bri, bri)
         lin.style.linestyle.color = make_color(bri)
-        lin.style.linestyle.width = 10
+        lin.style.linestyle.width = 20
     kml.save(args.zip_file + ".kml")
     print(f"{min_bri=} {max_bri=}")
 
