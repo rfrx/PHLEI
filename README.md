@@ -20,5 +20,17 @@ We base our calculations of the BRI on [Lee, Dong-youn, et al. "Development of a
 
 ## How can you execute this 
 
+This repository contains two example datasets collected with Phyphox, `data/good_path.zip` and `data/bad_path.zip`.
+To convert these into KML to use with the dashboard or Google Earth, run
+```bash
+./data-import.py --zip_file data/good_path.zip
+./data-import.py --zip_file data/bad_path.zip
+```
+This will generate `data/good_path.zip.kml` and `data/bad_path.zip.kml`.
+For convenience, the generated KML files for the example data are also included in the repository.
+Afterwards, run `dashboard.py` and open the printed link in your browser.
+
+Of course, you can collect your own dataset using the provided Phyphox experiment.
+
 ## What data is collected
 To calculate the BRI we need measurements linear acceleration on the z-axis and a GPS track. 
