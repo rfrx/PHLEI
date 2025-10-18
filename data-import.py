@@ -2,6 +2,7 @@
 
 import argparse
 import colorsys
+import pickle
 import zipfile
 import pandas as pd
 import os
@@ -9,22 +10,32 @@ from dataclasses import dataclass
 from math import exp, inf
 from simplekml import Kml
 
+class DistTracker:
+    def __init__(self):
+        self.counts = [0] * 5
+
+    def record(self, value):
+        self.counts[min(len(self.counts)-1, int(value * len(self.counts)))] += 1
+
 def scf(v):
     return 1.194 * v - 0.1733
 
 
-
-def sigmoid(x, l = 1, k = 8, a = 0.5):
+def sigmoid(x, l = 1, k = 10, a = 0.5):
   return l / (1 + exp(-k * (x - a)))
 
-def make_color(b):
-    GOOD_OBSERVED = 0
-    MAX_OBSERVED = 180
-    green_h = 130
+
+def make_color(b, tracker):
+    BAD_OBSERVED = 100
+    ratio = min(1,max(0, b/BAD_OBSERVED))
+    smoothed = sigmoid(ratio)
+    tracker.record(smoothed)
+
+    green_h = 130 / 360
     red_h = 0
-    ratio = min(1,max(0, b/MAX_OBSERVED))
-    h = green_h + ratio * (red_h - green_h)
-    r, g, b = colorsys.hsv_to_rgb(sigmoid(h / 360), 1, 0.7)
+    h = green_h + smoothed * (red_h - green_h)
+
+    r, g, b = colorsys.hsv_to_rgb(h, 1, 0.7)
     r = int(r * 256)
     g = int(g * 256)
     b = int(b * 256)
@@ -95,12 +106,20 @@ def main():
     parser = argparse.ArgumentParser(description='Extract specific files from zip archive and return DataFrame.')
     parser.add_argument('--zip_file', type=str, help='Path to the zip file')
     parser.add_argument('--filenames', nargs=2, type=str, default=['Linear Acceleration.csv', 'Location.csv'], help='Names of the two files to extract from the zip archive')
+    parser.add_argument('--tracker', type=str, default="tracker.pickle", help='path to tracker file')
 
     args = parser.parse_args()
 
     merged_data = extract_specific_files(args.zip_file, args.filenames)
 
-    # Print or return the DataFrame
+    try:
+        with open(args.tracker, "rb") as f:
+            tracker = pickle.load(f)
+        print("using tracker", tracker.counts)
+    except FileNotFoundError:
+        print("making new tracker")
+        tracker = DistTracker()
+
     kml = Kml()
     # fol = kml.newfolder(name=args.zip_file)
     min_bri = inf
@@ -113,10 +132,14 @@ def main():
         bri = segment.acc.abs().mean() * scf(segment.vel)
         min_bri = min(min_bri, bri)
         max_bri = max(max_bri, bri)
-        lin.style.linestyle.color = make_color(bri)
+        lin.style.linestyle.color = make_color(bri, tracker)
         lin.style.linestyle.width = 20
     kml.save(args.zip_file + ".kml")
     print(f"{min_bri=} {max_bri=}")
+
+    print("saving tracker", tracker.counts)
+    with open(args.tracker, "wb") as f:
+        pickle.dump(tracker, f)
 
 if __name__ == '__main__':
     main()
